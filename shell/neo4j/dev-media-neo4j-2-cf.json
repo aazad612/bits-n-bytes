@@ -1,0 +1,255 @@
+{
+    "AWSTemplateFormatVersion" : "2010-09-09",
+    "Description": "Neo4j Ent Edition",
+    "Mappings" : {
+      "VPCsgMap" : {
+        "dev"  : { "1" : "sg-06b9067e", "2": "sg-e2d6af99", "3": "sg-01283f7f"},
+        "int"  : { "1" : "sg-0cb80774", "2": "sg-fc057e86", "3": "sg-9fdccbe1"},
+        "qa"   : { "1" : "sg-bdf4b7c6", "2": "sg-602c3c1e", "3": "sg-38081846"},
+        "prod" : { "1" : "sg-94ffbcef", "2": "sg-f02d3d8e", "3": "sg-330e1e4d"}
+      },
+      "TopicMap" : {
+        "dev"  : { "1" : "arn:aws:sns:us-east-1:447434275168:dev-media-neo4j-sns"},
+        "int"  : { "1" : "arn:aws:sns:us-east-1:447434275168:int-media-neo4j-sns"},
+        "qa"   : { "1" : "arn:aws:sns:us-east-1:250312325083:qa-media-neo4j-sns"},
+        "prod" : { "1" : "arn:aws:sns:us-east-1:250312325083:prod-media-neo4j-sns"}
+      },
+      "VPCAZMap" : {
+        "dev"  : { "1" : "us-east-1a", "2" : "us-east-1d", "3" : "us-east-1c" },
+        "int"  : { "1" : "us-east-1d", "2" : "us-east-1c", "3" : "us-east-1a" },
+        "qa"   : { "1" : "us-east-1a", "2" : "us-east-1d", "3" : "us-east-1b" },
+        "prod" : { "1" : "us-east-1d", "2" : "us-east-1b", "3" : "us-east-1a" }
+      },
+      "VPCSubnetMap" : {
+        "dev"  : { "1" : "subnet-bdef03e5", "2" : "subnet-77428801", "3" : "subnet-02c3dd29" },
+        "int"  : { "1" : "subnet-304d8746", "2" : "subnet-46c2dc6d", "3" : "subnet-66ef033e" },
+        "qa"   : { "1" : "subnet-f55c6183", "2" : "subnet-c1ce8ceb", "3" : "subnet-4f6e2017" },
+        "prod" : { "1" : "subnet-20c88a0a", "2" : "subnet-39531d61", "3" : "subnet-c9635ebf" }
+      },
+      "ZoneMap" : {
+        "dev"  : { "sniglobalmedia" : "dev.sniglobalmedia.com", "mcd" : "mcd.snidev" },
+        "int"  : { "sniglobalmedia" : "int.sniglobalmedia.com", "mcd" : "mcd.sniint" },
+        "qa"   : { "sniglobalmedia" : "qa.sniglobalmedia.com", "mcd" : "mcd.sniqa" },
+        "prod" : { "sniglobalmedia" : "sniglobalmedia.com", "mcd" : "mcd.sniprod" }
+      },
+      "VPCMap" : {
+        "dev"  : { "1" : "vpc-deb820ba" },
+        "int"  : { "1" : "vpc-b8871fdc" },
+        "qa"   : { "1" : "vpc-a16fcac6" },
+        "prod" : { "1" : "vpc-1262c775" }
+      },
+      "NRLicMap" : {
+        "dev"  : { "1" : "593e9297d7d8400976d534757b870c62b23be1fa"},
+        "int"  : { "1" : "591bd152a72c092627467366bfa4d7089c1ea5e7"},
+        "qa"   : { "1" : "511e03fb2edb03fe11feff15651449e4ebc4abf1"},
+        "prod" : { "1" : "99da8ae7ed4c3671d04c4bcbb442a784fcde99db"}
+      },
+      "KeyMap" : {
+        "dev"  : { "1" : "kpd16068"},
+        "int"  : { "1" : "kpi16068"},
+        "qa"   : { "1" : "kpq16182"},
+        "prod" : { "1" : "kpp16182"}
+      },
+      "BucketFolderMap" : {
+        "main" : { "1" : "https://s3.amazonaws.com/sni.mcde.config/neo4j-main/"}
+      }
+    },
+    "Parameters": {
+        "ImageId": {
+            "Default": "ami-026365e605e33ab19",
+            "Description": "AMI id",
+            "Type": "String"
+        },
+        "InstanceType": {
+            "Default": "m4.4xlarge",
+            "Description": "AWS EC2 Instance type.",
+            "Type": "String"
+        },
+        "HostNum": {
+            "AllowedValues": [ "1","2","3" ],
+            "Default": "1",
+            "Description": "Cluster instance number",
+            "Type": "String"
+        },
+        "DOT": {
+            "AllowedValues": [ "true","false" ],
+            "Default": "true",
+            "Description": "Boolean delete ebs on termination",
+            "Type": "String"
+        },
+        "GraphEBSsize": {
+            "ConstraintDescription": "must be between 10 GB and 1024 GB.",
+            "Default": "50",
+            "Description": "Storage volume size in GB for the AWS EBS volume of the Test instance.",
+            "MaxValue": "1024",
+            "MinValue": "10",
+            "Type": "Number"
+        },
+        "IamRole": {
+            "Description": "Instance Role",
+            "Default": "dev.media.neo4j",
+            "Type": "String"
+        },
+        "UseKey": {
+            "AllowedValues": [ "Y", "N" ],
+            "Default": "Y",
+            "Description": "Create instance with an ssh key",
+            "Type": "String"
+        },
+        "UseProfile": {
+            "AllowedValues": [ "Y", "N" ],
+            "Default": "Y",
+            "Description": "Use an instance profile",
+            "Type": "String"
+        },
+        "Zone": {
+            "AllowedValues": [ "mcd", "sniglobalmedia" ],
+            "Default": "mcd",
+            "Description": "Name of R53 hosted zone",
+            "Type": "String"
+        },
+        "MasterELB": {
+            "Description": "ELB Name to route writes through. Get this from the output of the elb stack",
+            "Type": "String"
+        },
+        "SlaveELB": {
+            "Description": "ELB Name to route reads through. Get this from the output of the elb stack",
+            "Type": "String"
+        },
+        "TagName": {
+            "Default": "neo4j",
+            "Description": "Name",
+            "Type": "String"
+        },
+        "TagEnv": {
+            "AllowedValues": [ "dev", "int", "qa", "prod" ],
+            "Default": "dev",
+            "Description": "Environmental reference",
+            "Type": "String"
+        },
+        "TagOwner": {
+            "Default": "dl-mediaengineering@discovery.com",
+            "Description": "email address of responsible party",
+            "Type": "String"
+        },
+        "TagBusUnit": {
+            "AllowedValues": [ "mcd","media","contentdelivery" ],
+            "Default": "mcd",
+            "Description": "Business Owner",
+            "Type": "String"
+        },
+        "TagProject": {
+            "Default": "SAR Neo4j",
+            "Description": "Brief project name",
+            "Type": "String"
+        }
+    },
+    "Conditions" : {
+        "UseSSHKey" : {"Fn::Equals" : [{"Ref" : "UseKey"}, "Y"]},
+        "UseIAMProfile" : {"Fn::Equals" : [{"Ref" : "UseProfile"}, "Y"]}
+    },
+    "Resources": {
+        "ASG1": {
+            "Type" : "AWS::AutoScaling::AutoScalingGroup",
+            "Properties" : {
+               "Cooldown" : 180,
+               "DesiredCapacity" : "1",
+               "HealthCheckGracePeriod" : 300,
+               "HealthCheckType" : "EC2",
+               "LaunchConfigurationName" : { "Ref": "LaunchCFG1" },
+               "MaxSize" : "1",
+               "MinSize" : "1",
+               "NotificationConfigurations" : [
+                 {
+                   "NotificationTypes" : [
+                     "autoscaling:EC2_INSTANCE_LAUNCH",
+                     "autoscaling:EC2_INSTANCE_LAUNCH_ERROR",
+                     "autoscaling:EC2_INSTANCE_TERMINATE",
+                     "autoscaling:EC2_INSTANCE_TERMINATE_ERROR" ],
+                   "TopicARN" : { "Fn::FindInMap" : [ "TopicMap", { "Ref" : "TagEnv" }, "1"] }
+                 }
+               ],
+               "Tags" : [
+                 { "Key" : "Name", "Value": { "Fn::Join": ["-", [ {"Ref": "TagEnv"}, {"Ref": "TagBusUnit"}, {"Ref": "TagName"} ]]}, "PropagateAtLaunch" : "true"  },
+                 { "Key" : "Environment", "Value": {"Ref": "TagEnv"}, "PropagateAtLaunch" : "true" },
+                 { "Key" : "Owner", "Value": {"Ref": "TagOwner"}, "PropagateAtLaunch" : "true" },
+                 { "Key" : "BusinessUnit", "Value": {"Ref": "TagBusUnit"}, "PropagateAtLaunch" : "true" },
+                 { "Key" : "Project", "Value": {"Ref": "TagProject"}, "PropagateAtLaunch" : "true" }
+               ],
+               "TerminationPolicies" : ["OldestInstance"],
+               "LoadBalancerNames" : [  { "Ref" : "MasterELB" },
+                                        { "Ref" : "SlaveELB" }],
+               "VPCZoneIdentifier" : [ { "Fn::FindInMap" : [ "VPCSubnetMap", { "Ref" : "TagEnv" }, { "Ref" : "HostNum" } ] } ]
+            }
+        },
+        "GraphEBS" : {
+           "Type":"AWS::EC2::Volume",
+           "Properties" : {
+              "AvailabilityZone" : { "Fn::FindInMap" : [ "VPCAZMap", { "Ref" : "TagEnv" }, { "Ref" : "HostNum" } ] },
+              "Size" : { "Ref": "GraphEBSsize" },
+              "VolumeType" : "gp2",
+              "Tags" : [
+                { "Key" : "Name", "Value": { "Fn::Join": ["-", [ {"Ref": "TagEnv"}, {"Ref": "TagName"}, { "Ref" : "HostNum" } ]]} },
+                { "Key" : "Environment", "Value": {"Ref": "TagEnv"} },
+                { "Key" : "Owner", "Value": {"Ref": "TagOwner"} },
+                { "Key" : "BusinessUnit", "Value": {"Ref": "TagBusUnit"} },
+                { "Key" : "Project", "Value": {"Ref": "TagProject"} }
+              ]
+           },
+           "DeletionPolicy" : "Retain"
+        },
+        "LaunchCFG1": {
+            "Type": "AWS::AutoScaling::LaunchConfiguration",
+            "Metadata": {
+                "AWS::CloudFormation::Authentication": {
+                    "rolebased" : {
+                        "type": "S3",
+                        "buckets": [ "sni.mcde.config" ],
+                        "roleName": { "Ref": "IamRole" }
+                    }
+                }
+            },
+            "Properties": {
+                "ImageId": { "Ref": "ImageId" },
+                "InstanceType": { "Ref": "InstanceType" },
+                "IamInstanceProfile" : {
+                    "Fn::If" : [
+                        "UseIAMProfile",
+                        { "Ref": "IamRole" },
+                        { "Ref" : "AWS::NoValue"}
+                    ]
+                },
+                "KeyName": {
+                    "Fn::If" : [
+                        "UseSSHKey",
+                        { "Fn::FindInMap" : [ "KeyMap", { "Ref" : "TagEnv" }, "1" ] },
+                        { "Ref" : "AWS::NoValue"}
+                    ]
+                },
+                "SecurityGroups" : [ { "Fn::FindInMap" : [ "VPCsgMap", { "Ref" : "TagEnv" }, "1"] },
+                                     { "Fn::FindInMap" : [ "VPCsgMap", { "Ref" : "TagEnv" }, "2"] },
+                                     { "Fn::FindInMap" : [ "VPCsgMap", { "Ref" : "TagEnv" }, "3"] }],
+                "UserData": {
+                    "Fn::Base64": {
+                        "Fn::Join": [
+                            "",
+                            [
+                                "#!/bin/bash \n\n",
+                                "sudo su",
+                                "/opt/aws/bin/cfn-init --region ", { "Ref": "AWS::Region" },
+                                " -s ", { "Ref": "AWS::StackName" }, " -r LaunchCFG1 \n\n",
+                                "aws s3 cp s3://sni.mcde.config/neo4j-main/neo4j-cf-launch.sh /root/neo4j-cf-launch.sh && chmod 700 /root/neo4j-cf-launch.sh \n\n",
+                                "aws s3 cp s3://sni.mcde.config/neo4j-main/attach_volume.py /root/attach_volume.py && chmod 700 /root/attach_volume.py \n\n",
+                                "python /root/attach_volume.py --wait --tag Name --value ",
+                                { "Fn::Join": ["-", [ { "Ref" : "TagEnv" }, { "Ref" : "TagName" }, { "Ref" : "HostNum" } ] ] },
+                                " --attach_as /dev/xvdp \n\n",
+                                "bash /root/neo4j-cf-launch.sh neo4j-2.mcd.snidev"
+                            ]
+                        ]
+                    }
+                }
+            }
+        }
+    }
+}
+
