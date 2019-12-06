@@ -1,0 +1,1 @@
+Something I do anytime I get a few hours free, learn something new, node.js is amazing, I am absolutely in love with it, but I start working on learning something but have to drop it and pick up something else :), but just to show my efforts. 
